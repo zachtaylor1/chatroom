@@ -14,6 +14,8 @@ Registration
 
 Encryption? (hash passwords, etc)
 
+List users in room
+
 # Language
 
 Python or C#
