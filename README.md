@@ -18,5 +18,18 @@ Encryption? (hash passwords, etc)
 
 Python or C#
 
+Python due to use in class
+
+C# due to familiarity and easy GUI
+
 # Data Structures
 
+Hash Table for passwords
+
+JSON file for storing settings and login info
+
+# References
+
+Dr. Kim's example programs
+
+Microsoft .Net Docs
