@@ -28,6 +28,8 @@ Hash Table for passwords
 
 JSON file for storing settings and login info
 
+Chat history currently not kept: you only see what has been sent since you entered a chatroom.
+
 # References
 
 Dr. Kim's example programs
