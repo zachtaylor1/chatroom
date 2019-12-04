@@ -18,11 +18,7 @@ List users in room
 
 # Language
 
-Python or C#
-
-Python due to use in class
-
-C# due to familiarity and easy GUI
+Python
 
 # Data Structures
 
