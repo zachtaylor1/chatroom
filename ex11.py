@@ -19,7 +19,7 @@ password2 = StringVar()
 host_var = StringVar()
 
 def login():
-    if username.get() in login_info and login_info[username.get()] == password.get():
+    if Server.verify_login(username.get(), password.get()):
         viewer = User(username.get(), host_var.get(), default_port)
         send_button.configure(command = viewer.send)
         viewer.run_loops()
@@ -37,7 +37,6 @@ def nav_register():
     register_frame.pack()
 
 def nav_login():
-    
     register_frame.pack_forget()
     login_frame.pack()
 
@@ -49,7 +48,7 @@ def register():
     elif password.get() != password2.get():
         register_lbl.configure(text="passwords do not match")
     else:
-        login_info[username.get()] = password.get()
+        Server.register_user(username.get(), password.get())
         nav_login()
 
 #login_frame---------------------------------
@@ -236,6 +235,14 @@ class Server(Chatting):
         for cli in self.cli_info:
             msg = "l_users_: " + self.cli_info[cli]['name']
             self.broadcast(msg)
+    def verify_login(user, passw):
+        for l in login_info:
+            if user in login_info and login_info[user] == passw:
+                return True
+            else:
+                return False
+    def register_user(user, passw):
+        login_info[user]=passw
 
 class Client(Chatting):
     def __init__(self, name, host, port):
