@@ -190,11 +190,12 @@ class Server(Chatting):
     def handle_cli(self,cli):
         name = self.recv_mesg(cli)
         role = self.recv_mesg(cli)
-        mesg = "{} has joined as {}.".format(name, role)
+        mesg = "{} has joined the chat".format(name, role)
         print(mesg)
         self.cli_info[cli]['name'] = name
         self.cli_info[cli]['role'] = role
         self.list_users()
+        self.broadcast(mesg)
         while True:
             try:
                 msg = self.recv_mesg(cli)
