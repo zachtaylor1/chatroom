@@ -6,14 +6,98 @@ from tkinter import *
 
 quitcmd = '/quit'
 default_port = 12345
+
 login_info = {"test": "123"}
 
 #------------- tkinter stuff -----------------------------------------------
 root = tkinter.Tk()
 root.title('Please give me a good grade')
 
+username = StringVar()
+password = StringVar()
+password2 = StringVar()
+host_var = StringVar()
 
-login_frame = tkinter.Frame(root)
+def login():
+    if username.get() in login_info and login_info[username.get()] == password.get():
+        viewer = User(username.get(), host_var.get(), default_port)
+        send_button.configure(command = viewer.send)
+        viewer.run_loops()
+        login_frame.pack_forget()
+        main_frame.pack()
+    else:
+        user_entry.delete(0, END)
+        pass_entry.delete(0, END)
+        login_lbl.configure(text="Incorrect username/password")
+
+def nav_register():
+    user_entry.delete(0, END)
+    pass_entry.delete(0, END)
+    login_frame.pack_forget()
+    register_frame.pack()
+
+def nav_login():
+    
+    register_frame.pack_forget()
+    login_frame.pack()
+
+def register():
+    if not username.get() or not password.get() or not password2.get():
+        register_lbl.configure(text="all fields must be filled")
+    elif username.get() in login_info:
+        register_lbl.configure(text="username taken")
+    elif password.get() != password2.get():
+        register_lbl.configure(text="passwords do not match")
+    else:
+        login_info[username.get()] = password.get()
+        nav_login()
+
+#login_frame---------------------------------
+
+login_frame = tkinter.Frame(root, bd=100)
+login_grid = tkinter.Frame(login_frame)
+Label(login_grid, text='Username').grid(row=0) 
+Label(login_grid, text='Password').grid(row=1)
+Label(login_grid, text='Host:').grid(row=2)
+user_entry = Entry(login_grid, textvariable=username) 
+pass_entry = Entry(login_grid, textvariable=password)
+host_entry = Entry(login_grid, textvariable=host_var)
+user_entry.grid(row=0, column=1) 
+pass_entry.grid(row=1, column=1) 
+host_entry.grid(row=2, column=1)
+login_grid.pack()
+login_btn = tkinter.Button(login_frame, text="Login", command=login)
+login_btn.pack(pady = 10)
+nav_reg_btn = tkinter.Button(login_frame, text="Register", command=nav_register)
+nav_reg_btn.pack()
+login_lbl = tkinter.Label(login_frame)
+login_lbl.pack()
+
+#end of login_frame------------------------
+
+#register_frame----------------------------
+
+register_frame = tkinter.Frame(root, bd=100)
+
+register_grid = tkinter.Frame(register_frame)
+Label(register_grid, text='Username').grid(row=0) 
+Label(register_grid, text='Password').grid(row=1)
+Label(register_grid, text='Reenter Password').grid(row=2)
+e1 = Entry(register_grid, textvariable=username) 
+e2 = Entry(register_grid, textvariable=password)
+e3 = Entry(register_grid, textvariable=password2) 
+e1.grid(row=0, column=1)
+e2.grid(row=1, column=1)
+e3.grid(row=2, column=1)
+register_grid.pack()
+register_btn = tkinter.Button(register_frame, text="Register", command=register)
+register_btn.pack(pady=10)
+reg_back_btn = tkinter.Button(register_frame, text="Back", command=nav_login)
+reg_back_btn.pack(pady=10)
+register_lbl = tkinter.Label(register_frame)
+register_lbl.pack()
+
+#end of register_frame---------------------
 
 #main_frame--------------------------------
 
@@ -85,6 +169,7 @@ class Server(Chatting):
         super().__init__(host,port)
         print('Server.__init__')
         self.sock.setsockopt(SOL_SOCKET,SO_REUSEADDR,1)
+        self.addr = ('', port)
         self.sock.bind(self.addr)
         self.cli_info = {}
     def start(self):
@@ -110,7 +195,7 @@ class Server(Chatting):
         print(mesg)
         self.cli_info[cli]['name'] = name
         self.cli_info[cli]['role'] = role
-        #member_list.insert(END, self.cli_info[cli]['name'])
+        self.list_users()
         while True:
             try:
                 msg = self.recv_mesg(cli)
@@ -130,7 +215,6 @@ class Server(Chatting):
                         deleted.append(cli)
                 for cli in deleted:
                     cli.close()
-                    #member_list.delete(self.cli_info[cli]['name'], END)
                     del self.cli_info[cli]
                 self.broadcast('client left')
                 break
@@ -146,8 +230,12 @@ class Server(Chatting):
                     print('possibly closed. removed from the connections')
                     deleted.append(cli)
         for d in deleted:
-            #member_list.delete(self.cli_info[cli]['name'], END)
             del self.cli_info[d]
+    def list_users(self):
+        self.broadcast("c_users_:")
+        for cli in self.cli_info:
+            msg = "l_users_: " + self.cli_info[cli]['name']
+            self.broadcast(msg)
 
 class Client(Chatting):
     def __init__(self, name, host, port):
@@ -204,7 +292,13 @@ class User(Client):
                 break
             else:
                 print(msg)
-                msg_list.insert(END, msg)
+                msglist = msg.split()
+                if msglist[0] == "c_users_:":
+                    member_list.delete(0, END)
+                elif msglist[0] == "l_users_:":
+                    member_list.insert(END, msglist[1])
+                else:
+                    msg_list.insert(END, msg)
     def send(self):
         user_msg = self.name + ': ' + text_field.get(1.0, END)
         try:
@@ -218,7 +312,10 @@ class User(Client):
         return recv_thread
 
 def main(argc, argv):
-    if argv[1] == 'server':
+    if argc<2:
+        login_frame.pack()
+        root.mainloop()
+    elif argv[1] == 'server':
         host = argv[2]
         if argc <= 3:
             port = default_port
@@ -253,11 +350,11 @@ def main(argc, argv):
             port = int(argv[4])
         viewer = User(name,host,port)
         send_button.configure(command = viewer.send)
-        main_frame.pack()
+        login_frame.pack()
         viewer.run_loops()
         root.mainloop()
     else:
-        print("Undefined rule")
+        print("Unknown command")
 
 if __name__ == '__main__':
     main(len(sys.argv), sys.argv)
