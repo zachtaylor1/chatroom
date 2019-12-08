@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from socket import AF_INET, socket, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from threading import Thread
 import sys
@@ -242,12 +244,12 @@ class Server(Chatting):
     def handle_cli(self,cli):
         name = self.recv_mesg(cli)
         role = self.recv_mesg(cli)
-        mesg = "{} has joined the chat".format(name, role)
-        print(mesg)
         self.cli_info[cli]['name'] = name
         self.cli_info[cli]['role'] = role
         if self.cli_info[cli]['role'] == 'utility':
             self.handle_util(cli)
+        mesg = "{} has joined the chat\n".format(name, role)
+        print(mesg)
         self.list_users()
         self.broadcast(mesg)
         while True:
@@ -401,18 +403,19 @@ class User(Client):
     def recv_loop(self):
         while True:
             msg = self.recv_mesg(self.sock)
+            print(msg)
             if msg == quitcmd:
                 print('quit')
                 break
             else:
                 print(msg)
-                msglist = msg.split()
-                if msglist[0] == "c_users_:":
-                    member_list.delete(0, END)
-                elif msglist[0] == "l_users_:":
-                    member_list.insert(END, msglist[1])
-                else:
-                    msg_list.insert(END, msg)
+##                msglist = msg.split()
+##                if msglist[0] == "c_users_:":
+##                    member_list.delete(0, END)
+##                elif msglist[0] == "l_users_:":
+##                    member_list.insert(END, msglist[1])
+##                else:
+##                    msg_list.insert(END, msg)
     def send(self):
         user_msg = self.name + ': ' + text_field.get(1.0, END)
         try:
