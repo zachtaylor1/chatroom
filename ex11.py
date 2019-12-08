@@ -8,6 +8,7 @@ quitcmd = '/quit'
 default_port = 12345
 
 login_info = {"test": "123"}
+util_commands = {"q_user_:", "v_login_:", "r_user_:", "c_users_:", "l_users_:"}
 
 #------------- tkinter stuff -----------------------------------------------
 root = tkinter.Tk()
@@ -17,12 +18,42 @@ username = StringVar()
 password = StringVar()
 password2 = StringVar()
 host_var = StringVar()
+port_var = StringVar()
 
-def login():
-    if Server.verify_login(username.get(), password.get()):
-        viewer = User(username.get(), host_var.get(), default_port)
-        send_button.configure(command = viewer.send)
-        viewer.run_loops()
+user = None
+utility = None
+port = None
+host = None
+
+def connect():
+    global port
+    global host
+    global utility
+    try:
+        if not port_var.get():
+            port = default_port
+        else:
+            port = port_var.get()
+        host = host_var.get()
+        utility = Utility("utility", host, port)
+        utility.run_loops()
+        host_frame.pack_forget()
+        login_frame.pack()
+    except:
+        host_lbl.configure(text = "could not connect")
+
+def try_login():
+    if not username.get() or not password.get():
+        login_lbl.configure(text="all fields must be filled")
+    else:
+        utility.send("v_login_: " + username.get() + " " + password.get())
+
+def login(valid):
+    global user
+    if valid == 'True':
+        user = User(username.get(), host, port)
+        send_button.configure(command = user.send)
+        user.run_loops()
         login_frame.pack_forget()
         main_frame.pack()
     else:
@@ -40,16 +71,37 @@ def nav_login():
     register_frame.pack_forget()
     login_frame.pack()
 
-def register():
+def try_register():
     if not username.get() or not password.get() or not password2.get():
         register_lbl.configure(text="all fields must be filled")
-    elif username.get() in login_info:
-        register_lbl.configure(text="username taken")
     elif password.get() != password2.get():
         register_lbl.configure(text="passwords do not match")
     else:
-        Server.register_user(username.get(), password.get())
+        utility.send("r_user_: " + username.get() + " " + password.get())
+
+def register(valid):
+    if(valid == "True"):
         nav_login()
+    else:
+        register_lbl.configure(text="unable to register: username may be taken")
+
+#host_frame----------------------------------
+
+host_frame = tkinter.Frame(root, bd=100)
+host_grid = tkinter.Frame(host_frame)
+Label(host_grid, text='Host:').grid(row=0)
+Label(host_grid, text='Port (optional)').grid(row=1)
+host_entry = Entry(host_grid, textvariable=host_var)
+port_entry = Entry(host_grid, textvariable=port_var)
+host_entry.grid(row=0, column=1)
+port_entry.grid(row=1, column=1)
+host_grid.pack()
+host_btn = tkinter.Button(host_frame, text="Connect", command=connect)
+host_btn.pack(pady = 10)
+host_lbl = tkinter.Label(host_frame)
+host_lbl.pack()
+
+#end of host_frame---------------------------
 
 #login_frame---------------------------------
 
@@ -65,7 +117,7 @@ user_entry.grid(row=0, column=1)
 pass_entry.grid(row=1, column=1) 
 host_entry.grid(row=2, column=1)
 login_grid.pack()
-login_btn = tkinter.Button(login_frame, text="Login", command=login)
+login_btn = tkinter.Button(login_frame, text="Login", command=try_login)
 login_btn.pack(pady = 10)
 nav_reg_btn = tkinter.Button(login_frame, text="Register", command=nav_register)
 nav_reg_btn.pack()
@@ -89,7 +141,7 @@ e1.grid(row=0, column=1)
 e2.grid(row=1, column=1)
 e3.grid(row=2, column=1)
 register_grid.pack()
-register_btn = tkinter.Button(register_frame, text="Register", command=register)
+register_btn = tkinter.Button(register_frame, text="Register", command=try_register)
 register_btn.pack(pady=10)
 reg_back_btn = tkinter.Button(register_frame, text="Back", command=nav_login)
 reg_back_btn.pack(pady=10)
@@ -194,6 +246,8 @@ class Server(Chatting):
         print(mesg)
         self.cli_info[cli]['name'] = name
         self.cli_info[cli]['role'] = role
+        if self.cli_info[cli]['role'] == 'utility':
+            self.handle_util(cli)
         self.list_users()
         self.broadcast(mesg)
         while True:
@@ -234,16 +288,41 @@ class Server(Chatting):
     def list_users(self):
         self.broadcast("c_users_:")
         for cli in self.cli_info:
-            msg = "l_users_: " + self.cli_info[cli]['name']
-            self.broadcast(msg)
-    def verify_login(user, passw):
-        for l in login_info:
-            if user in login_info and login_info[user] == passw:
-                return True
+            if self.cli_info[cli]['role'] == 'user':
+                msg = "l_users_: " + self.cli_info[cli]['name']
+                self.broadcast(msg)
+    def verify_login(self, cli, user, passw):
+        if user in login_info and login_info[user] == passw:
+            self.send_mesg(cli, "v_login_: True")
+        else:
+            self.send_mesg(cli, "v_login_: False")
+    def register_user(self, cli, user, passw):
+        if user in login_info:
+            self.send_mesg(cli, "r_user_: False")
+        else:
+            login_info[user]=passw
+            self.send_mesg(cli, "r_user_: True")
+    def handle_util(self, cli):
+        while True:
+            try:
+                msg = self.recv_mesg(cli)
+            except OSError:
+                print('connection closed')
+                break
+            msglist = msg.split()
+            if msglist[0] in util_commands:
+                if msglist[0] == "v_login_:":
+                    self.verify_login(cli, msglist[1], msglist[2])
+                elif msglist[0] == "r_user_:":
+                    self.register_user(cli, msglist[1], msglist[2])
+                elif msglist[0] == "q_user_:":
+                    if self.cli_info[cli]['role'] == "user":
+                        mesg = "{} has left the chat".format(self.cli_info[cli]['name'])
+                        self.broadcast(mesg)
+                    cli.close()
+                    del self.cli_info[cli]
             else:
-                return False
-    def register_user(user, passw):
-        login_info[user]=passw
+                print("bad command")
 
 class Client(Chatting):
     def __init__(self, name, host, port):
@@ -286,6 +365,33 @@ class Sender(Client):
                 print('connection closed')
                 break
 
+class Utility(Client):
+    def __init__(self, name, host, port:int):
+        super().__init__(name,host,port)
+        print('Util.__init__')
+        self.name = name
+        self.send_mesg(self.sock,'utility')
+    def send(self, msg):
+        try:
+            self.send_mesg(self.sock, msg)
+        except OSError:
+            print('connection closed')
+    def recv_loop(self):
+        while True:
+            msg = self.recv_mesg(self.sock)
+            print("msg: " + msg)
+            msglist = msg.split()
+            if msglist[0] in util_commands:
+                if msglist[0] == "v_login_:":
+                    login(msglist[1])
+                elif msglist[0] == "r_user_:":
+                    register(msglist[1])
+            print(msg)
+    def run_loops(self):
+        recv_thread = Thread(target=self.recv_loop)
+        recv_thread.start()
+        return recv_thread
+
 class User(Client):
     def __init__(self, name, host, port:int):
         super().__init__(name,host,port)
@@ -321,7 +427,7 @@ class User(Client):
 
 def main(argc, argv):
     if argc<2:
-        login_frame.pack()
+        host_frame.pack()
         root.mainloop()
     elif argv[1] == 'server':
         host = argv[2]
@@ -358,7 +464,7 @@ def main(argc, argv):
             port = int(argv[4])
         viewer = User(name,host,port)
         send_button.configure(command = viewer.send)
-        login_frame.pack()
+        host_frame.pack()
         viewer.run_loops()
         root.mainloop()
     else:
