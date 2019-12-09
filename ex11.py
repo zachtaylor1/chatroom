@@ -12,6 +12,8 @@ default_port = 12345
 login_file = "login.json"
 
 util_commands = {"q_user_:", "v_login_:", "r_user_:", "c_users_:", "l_users_:"}
+util_commands2 = {"q_user_", "v_login_", "r_user_", "c_users_", "l_users_"}
+reserved_name = "utility"
 
 #------------- tkinter stuff -----------------------------------------------
 root = tkinter.Tk()
@@ -321,7 +323,7 @@ class Server(Chatting):
         else:
             self.send_mesg(cli, "v_login_: False")
     def register_user(self, cli, user, passw):
-        if user in self.login_info:
+        if user in self.login_info or user in util_commands or user in util_commands2 or user == reserved_name:
             self.send_mesg(cli, "r_user_: False")
         else:
             self.login_info[user]=passw
