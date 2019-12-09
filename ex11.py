@@ -3,13 +3,14 @@
 from socket import AF_INET, socket, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from threading import Thread
 import sys
+import json
 import tkinter
 from tkinter import *
 
 quitcmd = '/quit'
 default_port = 12345
+login_file = "login.json"
 
-login_info = {"test": "123"}
 util_commands = {"q_user_:", "v_login_:", "r_user_:", "c_users_:", "l_users_:"}
 
 #------------- tkinter stuff -----------------------------------------------
@@ -231,6 +232,9 @@ class Server(Chatting):
         self.addr = ('', port)
         self.sock.bind(self.addr)
         self.cli_info = {}
+        self.login_info = {}
+        with open(login_file, 'r+') as json_file:
+            self.login_info = json.load(json_file)
     def start(self):
         self.sock.listen(1)
         print('waiting')
@@ -312,15 +316,17 @@ class Server(Chatting):
                 msg = "l_users_: " + self.cli_info[cli]['name']
                 self.broadcast(msg)
     def verify_login(self, cli, user, passw):
-        if user in login_info and login_info[user] == passw:
+        if user in self.login_info and self.login_info[user] == passw:
             self.send_mesg(cli, "v_login_: True")
         else:
             self.send_mesg(cli, "v_login_: False")
     def register_user(self, cli, user, passw):
-        if user in login_info:
+        if user in self.login_info:
             self.send_mesg(cli, "r_user_: False")
         else:
-            login_info[user]=passw
+            self.login_info[user]=passw
+            with open('login.json', 'w+') as outfile:
+                json.dump(self.login_info, outfile)
             self.send_mesg(cli, "r_user_: True")
     def handle_util(self, cli):
         while True:
