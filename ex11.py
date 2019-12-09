@@ -16,6 +16,7 @@ util_commands = {"q_user_:", "v_login_:", "r_user_:", "c_users_:", "l_users_:"}
 root = tkinter.Tk()
 root.title('Please give me a good grade')
 
+
 username = StringVar()
 password = StringVar()
 password2 = StringVar()
@@ -87,6 +88,14 @@ def register(valid):
     else:
         register_lbl.configure(text="unable to register: username may be taken")
 
+def on_closing(event=None):
+    try:
+        user.quit_chat()
+    except:
+        print("closed")
+    root.destroy()
+    sys.exit()
+root.protocol("WM_DELETE_WINDOW", on_closing)
 #host_frame----------------------------------
 
 host_frame = tkinter.Frame(root, bd=100)
@@ -111,13 +120,10 @@ login_frame = tkinter.Frame(root, bd=100)
 login_grid = tkinter.Frame(login_frame)
 Label(login_grid, text='Username').grid(row=0) 
 Label(login_grid, text='Password').grid(row=1)
-Label(login_grid, text='Host:').grid(row=2)
 user_entry = Entry(login_grid, textvariable=username) 
 pass_entry = Entry(login_grid, textvariable=password)
-host_entry = Entry(login_grid, textvariable=host_var)
 user_entry.grid(row=0, column=1) 
 pass_entry.grid(row=1, column=1) 
-host_entry.grid(row=2, column=1)
 login_grid.pack()
 login_btn = tkinter.Button(login_frame, text="Login", command=try_login)
 login_btn.pack(pady = 10)
@@ -248,32 +254,44 @@ class Server(Chatting):
         self.cli_info[cli]['role'] = role
         if self.cli_info[cli]['role'] == 'utility':
             self.handle_util(cli)
-        mesg = "{} has joined the chat\n".format(name, role)
-        print(mesg)
-        self.list_users()
-        self.broadcast(mesg)
-        while True:
-            try:
-                msg = self.recv_mesg(cli)
-            except OSError:
-                print('connection closed')
-                break
-            if msg != quitcmd:
-                self.broadcast(msg)
-            else:
-                deleted = []
-                for cli in self.cli_info:
-                    cli_name = self.cli_info[cli]['name']
-                    cli_role = self.cli_info[cli]['role']
-                    if cli_name == name:
-                        if cli_role == 'viewer' or cli_role == 'user':
-                            self.send_mesg(cli,quitcmd)
-                        deleted.append(cli)
-                for cli in deleted:
-                    cli.close()
-                    del self.cli_info[cli]
-                self.broadcast('client left')
-                break
+        else:
+            mesg = "{} has joined the chat\n".format(name, role)
+            print(mesg)
+            self.list_users()
+            self.broadcast(mesg)
+            while True:
+                try:
+                    msg = self.recv_mesg(cli)
+                except OSError:
+                    print('connection closed')
+                    mesg = "{} has left the chat\n".format(name, role)
+                    print(mesg)
+                    self.broadcast(mesg)
+                    break
+                msglist = msg.split()
+                if msglist[0] in util_commands:
+                    if msglist[0] == "v_login_:":
+                        self.verify_login(cli, msglist[1], msglist[2])
+                    elif msglist[0] == "r_user_:":
+                        self.register_user(cli, msglist[1], msglist[2])
+                    elif msglist[0] == "q_user_:":
+                        deleted = []
+                        for cli in self.cli_info:
+                            cli_name = self.cli_info[cli]['name']
+                            cli_role = self.cli_info[cli]['role']
+                            if cli_name == name:
+                                if cli_role == 'user':
+                                    mesg = "{} has left the chat".format(cli_name)
+                                    print(mesg)
+                                    self.broadcast(mesg)
+                                deleted.append(cli)
+                        for cli in deleted:
+                            cli.close()
+                            del self.cli_info[cli]
+                        self.list_users()
+                        break
+                else:
+                    self.broadcast(msg)
     def broadcast(self, msg):
         deleted = []
         for cli in self.cli_info:
@@ -334,39 +352,6 @@ class Client(Chatting):
         self.sock.connect(self.addr)
         self.send_mesg(self.sock, name)
 
-class Viewer(Client):
-    def __init__(self, name, host, port:int):
-        super().__init__(name,host,port)
-        print('Viewer.__init__')
-        self.send_mesg(self.sock, 'viewer')
-    def recv_loop(self):
-        while True:
-            msg = self.recv_mesg(self.sock)
-            if msg == quitcmd:
-                print('quit')
-                break
-            else:
-                print(msg)
-
-class Sender(Client):
-    def __init__(self, name, host, port:int):
-        super().__init__(name,host,port)
-        print('Sender.__init__')
-        self.name = name
-        self.send_mesg(self.sock,'sender')
-    def send_loop(self):
-        while True:
-            user_msg = input('Enter input: ')
-            if user_msg != quitcmd:
-                msg = self.name + ':' + user_msg
-            else:
-                msg = user_msg
-            try:
-                self.send_mesg(self.sock, msg)
-            except OSError:
-                print('connection closed')
-                break
-
 class Utility(Client):
     def __init__(self, name, host, port:int):
         super().__init__(name,host,port)
@@ -409,13 +394,13 @@ class User(Client):
                 break
             else:
                 print(msg)
-##                msglist = msg.split()
-##                if msglist[0] == "c_users_:":
-##                    member_list.delete(0, END)
-##                elif msglist[0] == "l_users_:":
-##                    member_list.insert(END, msglist[1])
-##                else:
-##                    msg_list.insert(END, msg)
+                msglist = msg.split()
+                if msglist[0] == "c_users_:":
+                    member_list.delete(0, END)
+                elif msglist[0] == "l_users_:":
+                    member_list.insert(END, msglist[1])
+                else:
+                    msg_list.insert(END, msg)
     def send(self):
         user_msg = self.name + ': ' + text_field.get(1.0, END)
         try:
@@ -427,6 +412,8 @@ class User(Client):
         recv_thread = Thread(target=self.recv_loop)
         recv_thread.start()
         return recv_thread
+    def quit_chat(self):
+        self.send_mesg(self.sock, "q_user_: " + self.name)
 
 def main(argc, argv):
     if argc<2:
@@ -440,36 +427,6 @@ def main(argc, argv):
             port = int(argv[3])
         server = Server(host,port)
         server.start()
-    elif argv[1] == 'viewer':
-        name = argv[2]
-        host = argv[3]
-        if argc <= 4:
-            port = default_port
-        else:
-            port = int(argv[4])
-        viewer = Viewer(name,host,port)
-        viewer.recv_loop()
-    elif argv[1] == 'sender':
-        name = argv[2]
-        host = argv[3]
-        if argc <= 4:
-            port = default_port
-        else:
-            port = int(argv[4])
-        viewer = Sender(name,host,port)
-        viewer.send_loop()
-    elif argv[1] == 'user':
-        name = argv[2]
-        host = argv[3]
-        if argc <= 4:
-            port = default_port
-        else:
-            port = int(argv[4])
-        viewer = User(name,host,port)
-        send_button.configure(command = viewer.send)
-        host_frame.pack()
-        viewer.run_loops()
-        root.mainloop()
     else:
         print("Unknown command")
 
